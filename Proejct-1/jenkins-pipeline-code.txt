@@ -1,0 +1,52 @@
+pipeline {
+    agent any
+   
+    stages {
+        stage('checkout') {
+            steps {
+                git branch: '$branch', url: 'https://github.com/devopsbyraham/jenkins-java-project.git&#39;
+            }
+        }
+        stage('build') {
+            steps {
+                sh 'mvn compile'
+            }
+        }
+        stage('test') {
+            steps {
+                sh 'mvn test'
+            }
+        }
+        stage('artifact') {
+            steps {
+                sh 'mvn package'
+            }
+        }
+        stage('Nexus') {
+            steps {
+                nexusArtifactUploader artifacts: [[artifactId: 'NETFLIX', classifier: '', file: 'target/NETFLIX-1.2.2.war', type: '.war']], credentialsId: '35cc5458-5e5a-4992-8e90-394d9a3c9ab1', groupId: 'in.RAHAM', nexusUrl: 'ec2-3-80-145-80.compute-1.amazonaws.com:8081', nexusVersion: 'nexus3', protocol: 'http', repository: 'abcd', version: '1.2.2'
+            }
+        }
+        stage('deploy') {
+            steps {
+                deploy adapters: [
+                    tomcat9(
+                        credentialsId: '85e5e800-4740-461a-868d-519b51fa90ed',
+                        path: '',
+                        url: 'http://ec2-54-234-53-68.compute-1.amazonaws.com:8080/&#39;
+                    )
+                ],
+                contextPath: 'netflix',
+                war: 'target/*.war'
+            }
+        }
+    }
+    post {
+        always {
+            echo "slack notify"
+            slackSend (
+                 channel: '#netflix', message: "*${currentBuild.currentResult}:* Job ${env.JOB_NAME} \n build ${env.BUILD_NUMBER} \n More info at: ${env.BUILD_URL}"
+            )
+        }
+    }
+}
